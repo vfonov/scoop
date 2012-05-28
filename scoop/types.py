@@ -135,7 +135,9 @@ class Future(object):
         If the call raised then this method will raise the same exception.
         
         :returns: The value returned by the call."""
-        return scoop.futures._join(self)
+        if self.result_value is None:
+            return scoop.futures._join(self) 
+        return self.result_value
 
     def exception(self, timeout=None):
         """Return the exception raised by the call. If the call hasn't yet
@@ -165,8 +167,7 @@ class Future(object):
 
         If the future has already completed or been cancelled then callable will
         be called immediately."""
-        # TODO
-        pass
+        self.callback.append(callable)
 
 
 class FutureQueue(object):

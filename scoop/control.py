@@ -15,6 +15,7 @@
 #    License along with SCOOP. If not, see <http://www.gnu.org/licenses/>.
 #
 from __future__ import print_function
+from collections import deque
 import greenlet
 import os
 from .types import Future, FutureId, FutureQueue
@@ -52,8 +53,8 @@ def runFuture(task):
                                'callable': str(task.callable.__name__),
                                'parent': task.parentId})
     # Run callback (see http://www.python.org/dev/peps/pep-3148/#future-objects)
-    if task.callback != None:
-        try: task.callback(task)
+    for callback in task.callback:
+        try: callback(task)
         except: pass # Ignored callback exception as stated in PEP 3148
     return task
 
@@ -65,7 +66,7 @@ def runController(callable, *args, **kargs):
     
     # initialise queue
     if execQueue == None:
-        execQueue = FutureQueue()
+        execQueue = deque() if len(scoop.BROKER_ADDRESS) == 0  else FutureQueue()
     
     # launch task if origin or try to pickup a task if slave worker
     if is_origin == True:

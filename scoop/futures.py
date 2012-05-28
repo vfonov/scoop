@@ -29,7 +29,7 @@ _AS_COMPLETED = '_AS_COMPLETED'
 # This is the greenlet for running the controller logic.
 _controller = None
 
-def startup(rootFuture, *args, **kargs):
+def _startup(rootFuture, *args, **kargs):
     """This function initializes the SCOOP environment.
     
     :param rootFuture: Any callable object (function or class object with __call__
@@ -105,9 +105,7 @@ def map(func, *iterables, **kargs):
     :returns: A generator of map results, each corresponding to one map 
         iteration."""
     # Remove 'timeout' from kargs to be compliant with the futures API
-    if 'timeout' in kargs.keys():
-        # TODO
-        pass
+    kargs.pop('timeout', None)
     return _waitAll(*_mapFuture(func, *iterables, **kargs))
 
 def submit(func, *args, **kargs):
@@ -149,7 +147,7 @@ def _waitAny(*children):
         if task.exception:
             raise task.exception
         if task.result_value:
-            yield task.result_value
+            yield task.result_value, task.id
             n -= 1
         else:
             task.index = index
@@ -159,7 +157,7 @@ def _waitAny(*children):
         task.stopWatch.halt()
         childTask = _controller.switch(task)
         task.stopWatch.resume()
-        # Remove task entry from task_dict
+        yield result, taskid
         if childTask.exception:
             raise childTask.exception
         yield childTask.result_value
@@ -180,7 +178,7 @@ def _waitAll(*children):
     available before it can produce an output. See waitAny for an alternative
     option."""
     for index, task in enumerate(children):
-        for result in _waitAny(task):
+        for result, taskid in _waitAny(task):
             yield result
 
 def wait(fs, timeout=None, return_when=ALL_COMPLETED):
@@ -207,15 +205,15 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
         futures."""
     DoneAndNotDoneFutures = namedtuple('DoneAndNotDoneFutures', 'done not_done')
     if return_when == FIRST_COMPLETED:
-        for result in _waitAny(*fs):
+        for result, taskid in _waitAny(*fs):
             break
     elif return_when == ALL_COMPLETED:
         for result in _waitAll(*fs):
             pass
     elif return_when == FIRST_EXCEPTION:
         # TODO Add exception handling
-        iWait = _waitAny(*fs)
-        iWait.next()
+        for result, taskid in _waitAny(*fs):
+            pass
     done = set(f for f in fs if f.id in scoop.control.task_dict.keys() \
                              and scoop.control.task_dict[f.id].result != None)
     not_done = set(fs) - done
@@ -232,7 +230,8 @@ def as_completed(fs, timeout=None):
     :return: An iterator that yields the given Futures as they complete
         (finished or cancelled).
     """
-    return _waitAny(*fs)
+    for result, taskid in _waitAny(*fs):
+        yield scoop.control.task_dict[taskid]
 
 def _join(child):
     """This private function is for joining the current Future with one of its
@@ -244,7 +243,9 @@ def _join(child):
     
     Only one Future can be specified. The function returns a single
     corresponding result as soon as it becomes available."""
-    for result in _waitAny(child):
+    for result, taskid in _waitAny(child):
+        # Remove task entry from task_dict
+        scoop.control.task_dict.pop(child.id)
         return result
 
 def _joinAll(*children):

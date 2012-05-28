@@ -39,7 +39,7 @@ def func2(n):
     for i in range(n):
         launches.append(futures.submit(func3, i + 1))
     # Spawn a generator for each completion, unordered
-    result = futures.as_completed(launches)
+    result = [a.result() for a in futures.as_completed(launches)]
     return sum(result)
 
 def func3(n):
@@ -60,4 +60,4 @@ def main():
     return result
 
 if __name__ == "__main__":
-    futures.startup(main)
+    main()

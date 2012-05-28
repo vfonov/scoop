@@ -46,13 +46,6 @@ class Broker(object):
         # zmq Socket for the shutdown TODO this is temporary
         self.infoSocket = context.socket(zmq.PUB)
         self.infoSocket.bind(mSock)
-        
-        # Queue of available workers
-        self.available_workers = 0
-        self.workers_list = deque()
-
-        # List of waiting tasks
-        self.unassigned_tasks = deque()
 
         # init self.poller
         self.poller = zmq.Poller()
@@ -62,6 +55,18 @@ class Broker(object):
         # init statistics
         if scoop.DEBUG:
             self.stats = []
+        
+        # Two cases are important and must be optimised:
+        # - The search of unassigned task
+        # - the search of available workers 
+        # These represent when the broker must deal the communications the
+        # fastest. Other cases, the broker isn't flooded with urgent messages.
+        
+        # Initializing the queue of workers and tasks
+        # The busy workers variable will contain a dict (map) of workers: task
+        self.busy_workers = {}
+        self.available_workers = deque()
+        self.unassigned_tasks = deque()
 
     def run(self):
         while True:
@@ -69,25 +74,30 @@ class Broker(object):
             if (self.taskSocket in socks.keys() and socks[self.taskSocket] == zmq.POLLIN):
                 msg = self.taskSocket.recv_multipart()
                 msg_type = msg[1]
+                # Broker received a new task
                 if msg_type == TASK:
                     returnAddress = msg[0]
                     task = msg[2]
-                    if self.available_workers > 0:
-                        self.available_workers -= 1
-                        address = self.workers_list.pop()
-                        self.taskSocket.send_multipart([address, TASK, task])
-                    else:
-                        self.unassigned_tasks.append(task)
-                
-                elif msg_type == REQUEST:
                     try:
-                        address = msg[0]
+                        address = self.available_workers.popleft()
+                        self.busy_workers[address] = task
+                        self.taskSocket.send_multipart([address, TASK, task])
+                    except IndexError:
+                        self.unassigned_tasks.append(task)
+                        
+                # Broker received a request for task
+                elif msg_type == REQUEST:
+                    address = msg[0]
+                    if address in self.busy_workers:
+                        del self.busy_workers[address]
+                    
+                    try:
                         task = self.unassigned_tasks.pop()
                         self.taskSocket.send_multipart([address, TASK, task])
-                    except:
-                        self.available_workers += 1
-                        self.workers_list.append(msg[0])
+                    except IndexError:
+                        self.available_workers.append(address)
                 
+                # Broker received an answer needing delivery
                 elif msg_type == REPLY:
                     address = msg[3]
                     task = msg[2]
@@ -97,8 +107,9 @@ class Broker(object):
                     break
                     
                 if scoop.DEBUG:
-                    self.stats.append((time.time(), msg_type, len(self.unassigned_tasks), self.available_workers))
+                    self.stats.append((time.time(), msg_type, len(self.unassigned_tasks), len(self.available_workers)))
 
+    def shutdown(self):
         self.infoSocket.send(SHUTDOWN)
         # out of infinite loop: do some housekeeping
         time.sleep (0.3)
@@ -116,4 +127,7 @@ if __name__=="__main__":
     port = str(5555) if len(sys.argv) < 2 else sys.argv[1]
     info_port = str(5556) if len(sys.argv) < 3 else sys.argv[2]
     this_broker = Broker("tcp://*:" + port, "tcp://*:" + info_port)
-    this_broker.run()
+    try:
+        this_broker.run()
+    finally:
+        this_broker.shutdown()
