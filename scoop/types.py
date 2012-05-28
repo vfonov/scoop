@@ -66,6 +66,7 @@ class Future(object):
         self.stopWatch = StopWatch()      # stop watch for measuring time
         self.greenlet = None              # cooperative thread for running task 
         self.result_value = None          # task result
+        self.exception = None
         self.callback = None              # set callback
         # insert task into global dictionary
         scoop.control.task_dict[self.id] = self
@@ -249,5 +250,5 @@ class FutureQueue(object):
 
     def sendResult(self, task):
         task.greenlet = None  # greenlets cannot be pickled
-        assert task.result_value != None, "The results are not valid"
+        assert task.result_value != None or task.exception != None, "The results are not valid"
         self.socket.sendResult(task)
