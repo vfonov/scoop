@@ -223,8 +223,8 @@ your call with a list, such as::
     
     def add(x, y): return x + y
     
-    if __name__ == '__main__':
-        results = list(futures.map(add, range(8), range(8)))
+    if __name__ == "__main__":
+        results = list(futures.map(add, range(8), range(8)))   
 
 Large datasets
 ~~~~~~~~~~~~~~
@@ -234,7 +234,6 @@ Every parameter sent to a function by a :meth:`scoop.futures.map` or
 worker. Consider using a global variable in your module scope for passing large
 elements; it will then be loaded on launch by every worker and won't overload
 your network.
-
 Incorrect::
 
     from scoop import futures
