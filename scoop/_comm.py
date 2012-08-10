@@ -54,8 +54,7 @@ class ZMQCommunicator(object):
 
     def _recv(self):
         msg = self.socket.recv_multipart()
-        future = pickle.loads(msg[1])
-        return future
+        return pickle.loads(msg[1])
     
     def recvFuture(self):
         while self._poll(0):

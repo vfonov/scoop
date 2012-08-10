@@ -94,13 +94,13 @@ class Future(object):
     def __repr__(self):
         """Convert future to string."""
         try:
-            return "{0}:{1}({2})={3}".format(self.id,
+            return "{0}:{1}{2}={3}".format(self.id,
                                        self.callable.__name__,
                                        self.args,
                                        self.resultValue)
         except AttributeError:
-            return "{0}:{1}({2})={3}".format(self.id,
-                                       "root",
+            return "{0}:{1}{2}={3}".format(self.id,
+                                       "partial",
                                        self.args,
                                        self.resultValue)
 
@@ -234,6 +234,12 @@ class FutureQueue(object):
                 self.socket.sendFuture(future)
             else:
                 self.movable.append(future)
+        # Send oldest futures to the broker
+        while len(self.movable) > self.highwatermark:
+            out = self.movable.pop()
+            if scoop.worker != out.id.worker:
+                del scoop._control.futureDict[out.id]
+            self.socket.sendFuture(out)
         
     def pop(self):
         """Pop the next future from the queue; 

@@ -17,4 +17,4 @@ export PATH=$HOME/python/bin:$PATH
 #workon yourenvironment
 
 # Launch the remotes workers
-python -m scoop -vv fullTree.py
+python -m scoop fullTree.py

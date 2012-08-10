@@ -53,15 +53,17 @@ def getHosts(filename = None, hostlist = None):
         return getHostsFromPBS()
     elif "PE_HOSTFILE" in os.environ:
         return getHostsFromSGE()
-    elif filename:
-        return getHostsFromFile(filename)
-    elif hostlist:
-        return getHostsFromList(hostlist)
-
+    else:
+        if filename:
+            return getHostsFromFile(filename)
+        elif hostlist:
+            return getHostsFromList(hostlist)
+        else:
+            return getDefaultHosts()
 def getHostsFromFile(filename):
     ValidHostname = r"[^ /\t:=\n]*" # TODO This won't work with ipv6 address
-                                  # TODO find a better regex that works with
-                                  # all valid hostnames   
+                                    # TODO find a better regex that works 
+                                    # with all valid hostnames   
     workers = r"\d+"
     hn = re.compile(ValidHostname)
     w = re.compile(workers)
@@ -99,3 +101,11 @@ def getWorkerQte(hosts):
         return int(os.environ["NSLOTS"])
     else:
         return sum(host[1] for host in hosts)
+
+
+def KeyboardInterruptHandler(signum, frame):
+    raise KeyboardInterrupt("Shutting down!")
+
+def getDefaultHosts():
+    return [('127.0.0.1', getCPUcount())]
+

@@ -25,6 +25,9 @@ import time
 import logging
 from scoop import utils
 from threading import Thread
+import signal
+
+signal.signal(signal.SIGQUIT, utils.KeyboardInterruptHandler)
 
 class launchScoop(object):
     def __init__(self, hosts, n, verbose, python_executable, brokerHostname,
@@ -249,8 +252,7 @@ group = parser.add_mutually_exclusive_group()
 group.add_argument('--hosts', '--host',
                     help="The list of hosts. The first host will execute the "
                          "origin. (default is 127.0.0.1)",
-                    nargs='*',
-                    default=["127.0.0.1"])
+                    nargs='*')
 group.add_argument('--hostfile', help="The hostfile name")
 parser.add_argument('--path', '-p',
                     help="The path to the executable on remote hosts  (default "
@@ -311,8 +313,6 @@ args = parser.parse_args()
         
 if __name__ == "__main__":
     hosts = utils.getHosts(args.hostfile, args.hosts)
-    if len(hosts) == 1 and hosts[0][0] == "127.0.0.1":
-        hosts = [("127.0.0.1", utils.getCPUcount())]
     if args.n:
         n = args.n
     else:
