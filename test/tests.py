@@ -21,6 +21,8 @@ scoop.DEBUG = False
 
 from scoop import futures
 from scoop import _control
+from scoop import utils
+from scoop._types import FutureQueue
 import unittest
 import subprocess
 import time
@@ -28,7 +30,18 @@ import copy
 import os
 import sys
 import operator
+import signal
 from tests_parser import TestUtils
+
+subprocesses = []
+def cleanSubprocesses():
+    [a.kill() for a in subprocesses]
+
+try:
+    signal.signal(signal.SIGQUIT, cleanSubprocesses)
+except AttributeError:
+    # SIGQUIT doesn't exist on Windows
+    signal.signal(signal.SIGTERM, cleanSubprocesses)
 
     
 def func0(n):
@@ -156,12 +169,15 @@ class TestScoopCommon(unittest.TestCase):
         super(TestScoopCommon, self).__init__(*args, **kwargs)
         
     def multiworker_set(self):
+        global subprocesses
         worker = subprocess.Popen([sys.executable, "-m", "scoop.bootstrap",
         "--workerName", "worker", "--brokerName", "broker", "--brokerAddress",
         "tcp://127.0.0.1:5555", "--metaAddress", "tcp://127.0.0.1:5556", "tests.py"])
+        subprocesses.append(worker)
         return worker
         
     def setUp(self):
+        global subprocesses
         # Start the server
         self.server = subprocess.Popen([sys.executable,"-m", "scoop.broker",
         "--tPort", "5555", "--mPort", "5556"])
@@ -172,6 +188,7 @@ class TestScoopCommon(unittest.TestCase):
             if (datetime.datetime.now() - begin > datetime.timedelta(seconds=3)):
                 raise Exception('Could not start server!')
             pass
+        subprocesses.append(self.server)
         scoop.IS_ORIGIN = True
         scoop.WORKER_NAME = 'origin'.encode()
         scoop.BROKER_NAME = 'broker'.encode()
@@ -181,8 +198,10 @@ class TestScoopCommon(unittest.TestCase):
         scoop.VALID = True
         scoop.DEBUG = False
         scoop.SIZE = 2
+        scoop._control.execQueue = FutureQueue()
         
     def tearDown(self):
+        global subprocesses
         scoop._control.futureDict.clear()
         try: self.w.kill()
         except: pass
@@ -191,6 +210,7 @@ class TestScoopCommon(unittest.TestCase):
             try: self.server.kill()
             except: pass
         # Stabilise zmq after a deleted socket
+        del subprocesses[:]
         time.sleep(0.1)
             
 
@@ -263,7 +283,7 @@ class TestMultiFunction(TestScoopCommon):
         time.sleep(0.5)
         os.environ = Backupenv
 
-    def test_execQueue(self):
+    def test_execQueue_multiworker(self):
         self.w = self.multiworker_set()
         result = futures._startup(func0, 20)
         time.sleep(0.5)
@@ -271,8 +291,7 @@ class TestMultiFunction(TestScoopCommon):
         self.assertEqual(len(scoop._control.execQueue.ready), 0)
         self.assertEqual(len(scoop._control.execQueue.movable), 0)
 
-    def test_execQueue(self):
-        self.w = self.multiworker_set()
+    def test_execQueue_uniworker(self):
         result = futures._startup(func0, 20)
         time.sleep(0.5)
         self.assertEqual(len(scoop._control.execQueue.inprogress), 0)

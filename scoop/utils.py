@@ -16,7 +16,7 @@
 #    License along with SCOOP. If not, see <http://www.gnu.org/licenses/>.
 #
 from multiprocessing import cpu_count
-from collections import Counter
+from itertools import groupby
 import os
 import re
 import socket
@@ -35,6 +35,18 @@ def broker_hostname(hosts):
             raise Exception("\nThe first host (broker) is not routable.\n"
                             "Make sure the address is correct.")
     return hostname
+
+
+def groupTogether(inList):
+    # TODO: This algorithm is not efficient
+    retVal = []
+    alreadyDone = []
+    for index, element in enumerate(inList):
+        if element not in alreadyDone:
+            howMuch = inList[index + 1:].count(element)
+            retVal += [element]*(howMuch + 1)
+            alreadyDone.append(element)
+    return retVal
 
 
 def getCPUcount():
@@ -67,16 +79,14 @@ def getHosts(filename=None, hostlist=None):
 
 
 def getHostsFromFile(filename):
-    ValidHostname = r"[^ /\t=\n]*"  # TODO This won't work with ipv6 address
-                                    # TODO find a better regex that works
-                                    # with all valid hostnames
+    ValidHostname = r"^[^ /\t=\n]+"
     workers = r"\d+"
     hn = re.compile(ValidHostname)
     w = re.compile(workers)
     hosts = []
     with open(filename) as f:
         for line in f:
-            host = hn.search(line)
+            host = hn.search(line.strip())
             if host:
                 hostname = host.group()
                 n = w.search(line[host.end():])
@@ -89,12 +99,24 @@ def getHostsFromFile(filename):
 
 
 def getHostsFromList(hostlist):
-    return [i for i in Counter(hostlist).items()]
+    # Counter would be more efficient but:
+    # 1. Won't be Python 2.6 compatible
+    # 2. Won't be ordered
+    hostlist = groupTogether(hostlist)
+    retVal = []
+    for key, group in groupby(hostlist):
+        retVal.append((key, len(list(group))))
+    return retVal
 
 
 def getHostsFromPBS():
+    # See above comment about Counter
     with open(os.environ["PBS_NODEFILE"], 'r') as hosts:
-        return [i for i in Counter(hosts.read().split()).items()]
+        hostlist = groupTogether(hosts.read().split())
+        retVal = []
+        for key, group in groupby(hostlist):
+            retVal.append((key, len(list(group))))
+        return retVal
 
 
 def getHostsFromSGE():

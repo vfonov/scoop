@@ -15,7 +15,6 @@
 #    You should have received a copy of the GNU Lesser General Public
 #    License along with SCOOP. If not, see <http://www.gnu.org/licenses/>.
 #
-from __future__ import print_function
 import argparse
 import os
 import sys
@@ -27,7 +26,11 @@ from scoop import utils
 from threading import Thread
 import signal
 
-signal.signal(signal.SIGTERM, utils.KeyboardInterruptHandler)
+try:
+    signal.signal(signal.SIGQUIT, utils.KeyboardInterruptHandler)
+except AttributeError:
+    # SIGQUIT doesn't exist on Windows
+    signal.signal(signal.SIGTERM, utils.KeyboardInterruptHandler)
 
 
 class launchScoop(object):
@@ -37,9 +40,9 @@ class launchScoop(object):
         # Assure setup sanity
         assert type(hosts) == list and hosts != [], ("You should at least "
                                                      "specify one host.")
-        hosts.reverse()
         self.workersLeft = n
         self.createdSubprocesses = []
+        self.createdRemoteConn = {}
 
         # launch information
         self.python_executable = python_executable[0]
@@ -69,7 +72,7 @@ class launchScoop(object):
 
         if env in ["PBS", "SGE"]:
             logging.info("Detected {0} environment.".format(env))
-        logging.info("Deploying {0} workers over {1} "
+        logging.info("Deploying {0} worker(s) over {1} "
                      "host(s).".format(n,
                                        len(hosts)))
 
@@ -131,8 +134,11 @@ class launchScoop(object):
                     arguments=" ".join(self.args))
 
     def divideHosts(self, hosts):
-        """ Separe the workers accross hosts. """
+        """Divide the workers accross hosts."""
         maximumWorkers = sum(host[1] for host in hosts)
+
+
+        # If specified amount of workers is greater than sum of each specified.
         if self.n > maximumWorkers:
             logging.info("The -n flag is set at {0} workers, which is higher "
                          "than the maximum number of workers ({1}) specified "
@@ -145,6 +151,21 @@ class launchScoop(object):
             index = (index + 1) % len(hosts)
             maximumWorkers += 1
 
+        # If specified amount of workers if lower than sum of each specified.
+        if self.n < maximumWorkers:
+            logging.info("The -n flag is set at {0} workers, which is lower "
+                         "than the maximum number of workers ({1}) specified "
+                         "by the hostfile."
+                         "".format(self.n, sum(host[1] for host in hosts)))
+        while self.n < maximumWorkers:
+            if hosts[-1][1] > maximumWorkers - self.n:
+                hosts[-1] = (hosts[-1][0],
+                             hosts[-1][1] - (maximumWorkers - self.n))
+            else:
+                del hosts[-1]
+            maximumWorkers = sum(host[1] for host in hosts)
+
+        # Checking if the broker if externally routable
         if self.brokerHostname in ["127.0.0.1", "localhost"] and \
                 len(hosts) > 1 and \
                 self.e is not True:
@@ -154,16 +175,18 @@ class launchScoop(object):
                             "Please specify your externally routable hostname "
                             "or IP using the --broker-hostname parameter.")
 
+        hosts.reverse()
         self.hosts = hosts
 
         # Show worker distribution
+        nbWorkers = 0
         if self.verbose > 1:
             logging.info('Worker distribution: ')
-            for worker, number in self.hosts:
+            for worker, number in reversed(self.hosts):
                 logging.info('   {0}:\t{1} {2}'.format(
                     worker,
-                    number - 1 if worker == hosts[0][0] else str(number),
-                    "+ origin" if worker == hosts[0][0] else ""))
+                    number - 1 if worker == hosts[-1][0] else str(number),
+                    "+ origin" if worker == hosts[-1][0] else ""))
 
     def startBroker(self):
         """Starts a broker on random unoccupied port(s)"""
@@ -197,10 +220,13 @@ class launchScoop(object):
 
     def run(self):
         # Launching the local broker, repeat until it works
+        logging.debug("Initialising local broker.")
         self.startBroker()
+        logging.debug("Local broker launched on ports {0}, {1}"
+                      ".".format(self.brokerPort, self.infoPort))
 
         # Launch the workers
-
+        rootProcess="Local"
         for host in self.hosts:
             command = []
             for n in range(min(host[1], self.workersLeft)):
@@ -227,21 +253,36 @@ class launchScoop(object):
                         '-R {0}:127.0.0.1:{0}'.format(self.infoPort)]
                 shell = subprocess.Popen(ssh_command + [
                     host[0],
-                    "bash -c '{0}; wait'".format(" & ".join(command))])
-                self.createdSubprocesses.append(shell)
+                    "bash -c 'ps -o pgid= -p $BASHPID && {0} &'".format(" & ".join(command))],
+                                         stdin=subprocess.PIPE,
+                                         stdout=subprocess.PIPE)
+                self.createdRemoteConn[shell] = [host[0]]
+                if self.workersLeft == 0:
+                    rootProcess = shell
                 command = []
             if self.workersLeft <= 0:
                 # We've launched every worker we needed, so let's exit the loop
                 break
 
         # Ensure everything is started normaly
-        for this_subprocess in self.createdSubprocesses:
-            if this_subprocess.poll() is not None:
+        for thisSubprocess in self.createdSubprocesses:
+            if thisSubprocess.poll() is not None:
                 raise Exception('Subprocess {0} terminated abnormaly.'
-                                .format(this_subprocess))
+                                .format(thisSubprocess))
 
-        # wait for the origin
-        self.errors = self.createdSubprocesses[-1].wait()
+        # Get group id from remote connections
+        for thisRemote in self.createdRemoteConn.keys():
+            GID = thisRemote.stdout.readline().strip()
+            self.createdRemoteConn[thisRemote].append(GID)
+
+        # Wait for the root program
+        if rootProcess == "Local":
+            self.errors = self.createdSubprocesses[-1].wait()
+        else:
+            data = rootProcess.stdout.read(1)
+            while len(data) > 0:
+                sys.stdout.write(data)
+                data = rootProcess.stdout.read(1)
 
     def close(self):
         # Ensure everything is cleaned up on exit
@@ -249,13 +290,23 @@ class launchScoop(object):
         # Kill the broker last
         self.createdSubprocesses.reverse()
         if self.debug == 1:
-            # give time to flush data
+            # Give time to flush data
             time.sleep(1)
         for process in self.createdSubprocesses:
             try:
                 process.terminate()
             except OSError:
                 pass
+        logging.debug('Destroying remote elements...')
+        for shell, data in self.createdRemoteConn.items():
+            if len(data) > 1:
+                ssh_command = ['ssh', '-x', '-n', '-oStrictHostKeyChecking=no']
+                subprocess.Popen(ssh_command + [
+                    data[0],
+                    "bash -c 'kill -9 -{0} &>/dev/null'".format(data[1])]).wait()
+            else:
+                logging.info('Zombie process left!')
+
         logging.info('Finished destroying spawned subprocesses.')
         exit(self.errors)
 
@@ -300,7 +351,8 @@ parser.add_argument('-e',
 parser.add_argument('--broker-hostname',
                     nargs=1,
                     help="The externally routable broker hostname / ip "
-                         "(defaults to the local hostname)")
+                         "(defaults to the local hostname)",
+                    default=[utils.getCurrentHostname()])
 parser.add_argument('--python-executable',
                     nargs=1,
                     help="The python executable with which to execute the "

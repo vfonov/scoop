@@ -10,9 +10,9 @@ Nomenclature
   Keyword   Description
 =========== =======================================================================================================================================
 Future(s)   The Future class encapsulates the asynchronous execution of a callable.
-Broker      Dispatch Futures.
+Broker      Process dispatching Futures.
 Worker      Process executing Futures.
-Origin      The worker executing the user program.
+Root        The worker executing the root Future.
 =========== =======================================================================================================================================
 
 Architecture diagram
@@ -20,7 +20,7 @@ Architecture diagram
 
 The future(s) distribution over workers is done by a variation of the 
 `Broker pattern <http://zguide.zeromq.org/page:all#A-Request-Reply-Broker>`_. 
-In such pattern, workers act as independant elements which interacts with a 
+In such a pattern, workers act as independant elements that interact with a 
 broker to mediate their communications.
 
 .. image:: images/architecture.png
@@ -31,7 +31,7 @@ How to use SCOOP in your code
 
 The philosophy of SCOOP is loosely built around the *futures* module proposed 
 by :pep:`3148`. It primarily defines a :meth:`~scoop.futures.map` and a 
-:meth:`~scoop.futures.submit` function allowing asynchroneous computation which 
+:meth:`~scoop.futures.submit` function allowing asynchroneous computation that 
 SCOOP will propagate to its workers. 
 
 Map
@@ -54,8 +54,8 @@ example, if you want to apply the |abs()|_ function to every number of a list::
 .. |abs()| replace:: *abs()*
 .. _abs(): http://docs.python.org/library/functions.html#abs
 
-SCOOP's :meth:`~scoop.futures.map` returns a generator over the results 
-in-order. It can thus act as a parallel substitute to the standard |map()|_, for
+SCOOP's :meth:`~scoop.futures.map` returns a generator retriving the results 
+in their proper order. It can thus act as a parallel substitute to the standard |map()|_, for
 instance::
 
     # Script to be launched with: python -m scoop scriptName.py
@@ -77,11 +77,12 @@ instance::
 
 .. _test-for-main-mandatory:
 
-.. note::
-    You *must* wrap your code with a test for the __main__ name as show above.
+.. warning::
+    In your root program, you *must* check ``if __name__ == __main__`` as
+    show above.
     Failure to do so will result in every worker trying to run their own 
     instance of the program. This ensures that every worker waits for 
-    parallelized tasks spawned by the origin worker.
+    parallelized tasks spawned by the root worker.
 
 .. note::
     Your callable function passed to SCOOP must be picklable in its entirety.
@@ -91,7 +92,8 @@ Submit
 
 SCOOP's :meth:`~scoop.futures.submit` returns a :class:`~scoop._types.Future` 
 instance. 
-This allows a finer control over the Futures, such as out-of-order processing.
+This allows a finer control over the Futures, such as out-of-order results 
+retrieval.
 
 .. _examples-reference:
 
@@ -102,98 +104,15 @@ This allows a finer control over the Futures, such as out-of-order processing.
 
 Examples
 --------
-    
-Examples are available in the |exampleDirectory|_ directory of SCOOP. 
+
+Examples are available in the |exampleDirectory|_ directory of SCOOP.
 
 .. |exampleDirectory| replace:: :file:`examples/`
 .. _exampleDirectory: https://code.google.com/p/scoop/source/browse/examples/
 
-Computation of :math:`\pi`
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Please refer to the :doc:`examples` page where detailed explanations are
+available.
 
-A `Monte-Carlo method <http://en.wikipedia.org/wiki/Monte_Carlo_method>`_ to 
-calculate :math:`\pi` using SCOOP to parallelize its computation is found in 
-|piCalcFile|_.
-You should familiarize yourself with 
-`Monte-Carlo methods <http://en.wikipedia.org/wiki/Monte_Carlo_method>`_ before
-going forth with this example. 
-
-.. |piCalcFile| replace:: :file:`examples/piCalc.py`
-.. _piCalcFile: https://code.google.com/p/scoop/source/browse/examples/piCalc.py
-
-First, we need to import the needed functions as such:
-
-.. literalinclude:: ../examples/piCalcDoc.py
-   :lines: 22-24
-   :linenos:
-
-The `Monte-Carlo method <http://en.wikipedia.org/wiki/Monte_Carlo_method>`_ is
-then defined. It spawns two pseudo-random numbers that are fed to the 
-`hypot <http://docs.python.org/library/math.html#math.hypot>`_ function which 
-calculates the hypotenuse of its parameters.
-This step computes the 
-`Pythagorean equation <http://en.wikipedia.org/wiki/Pythagorean_theorem>`_
-(:math:`\sqrt{x^2+y^2}`) of the given parameters to find the distance from the 
-origin (0,0) to the randomly placed point (which X and Y values were generated 
-from the two pseudo-random values).
-Then, the result is compared to one to evaluate if this point is inside or 
-outside the `unit disk <http://en.wikipedia.org/wiki/Unit_disk>`_.
-If it is inside (have a distance from the origin lesser than one), a value of 
-one is produced, otherwise the value is zero.
-The experiment is repeated ``tries`` number of times with new random values.
-
-The function returns the number times a pseudo-randomly generated point fell
-inside the `unit disk <http://en.wikipedia.org/wiki/Unit_disk>`_ for a given
-number of tries.
-
-.. TODO: don't restart line numbering
-
-.. literalinclude:: ../examples/piCalcDoc.py
-   :lines: 26-27
-   :linenos:
-
-One way to obtain a more precise result with a 
-`Monte-Carlo method <http://en.wikipedia.org/wiki/Monte_Carlo_method>`_ is to
-perform the method multiple times. The following function executes repeatedly
-the previous function to gain more precision.
-These calls are handled by SCOOP using it's :meth:`~scoop.futures.map` 
-function.
-The results, that is the number of times a random distribution over a 1x1 
-square hits the `unit disk <http://en.wikipedia.org/wiki/Unit_disk>`_ over a 
-given number of tries, are then summed and divided by the total of tries.
-Since we only covered the upper right quadrant of the
-`unit disk <http://en.wikipedia.org/wiki/Unit_disk>`_ because both parameters
-are positive in a cartesian map, the result must be multiplied by 4 to get the 
-relation between area and circumference, namely 
-:math:`\pi`.
-
-.. literalinclude:: ../examples/piCalcDoc.py
-   :lines: 29-31
-   :linenos:
-
-As :ref:`stated above <test-for-main-mandatory>`, you `must` wrap your code with a test for the __main__ name.
-You can now run your code using the command :program:`python -m scoop`.
-
-.. literalinclude:: ../examples/piCalcDoc.py
-   :lines: 33-34
-   :linenos:
-
-Overall example
-~~~~~~~~~~~~~~~
-
-The |fullTreeFile|_ example holds a pretty good wrap-up of available
-functionnalities:
-
-.. TODO: Document it like piCalc.
-
-.. |fullTreeFile| replace:: :file:`examples/fullTree.py`
-.. _fullTreeFile: https://code.google.com/p/scoop/source/browse/examples/fullTree.py
-
-.. literalinclude:: ../examples/fullTree.py
-   :lines: 22-
-    
-Please check the :doc:`api` for any implentation detail of the proposed 
-functions.
 
 How to launch SCOOP programs
 ----------------------------
@@ -208,9 +127,10 @@ passed to Python, as such::
     python -m scoop fullTree.py
 
 .. note::
-  If you are using a Python version prior to 2.7, you must start SCOOP using 
-  :option:`-m scoop.__main__`. You should also consider using an up-to-date 
-  version of Python.
+  When using a Python version prior to 2.7, you must start SCOOP using 
+  :option:`-m scoop.__main__`.
+
+  You should also consider using an up-to-date version of Python.
     
 Here is a list of the parameters that can be passed to SCOOP::
 
@@ -234,7 +154,7 @@ Here is a list of the parameters that can be passed to SCOOP::
       -h, --help            show this help message and exit
       --hosts [HOSTS [HOSTS ...]], --host [HOSTS [HOSTS ...]]
                             The list of hosts. The first host will execute the
-                            origin. (default is 127.0.0.1)
+                            root program. (default is 127.0.0.1)
       --hostfile HOSTFILE   The hostfile name
       --path PATH, -p PATH  The path to the executable on remote hosts (default 
                             is local directory)
@@ -280,14 +200,15 @@ your_program.py     The program to be launched.
 Hostfile format
 ~~~~~~~~~~~~~~~
 
-.. TODO: slots inevitable?
-
-You should create a hostfile and pass it to SCOOP using the :option:`--hostfile` argument.
+You can specify the hosts with a hostfile and pass it to SCOOP using the :option:`--hostfile` argument.
 The hostfile should use the following syntax::
 
-    hostname_or_ip workers=4
-    other_hostname workers=5
-    third_hostname workers=2
+    hostname_or_ip 4
+    other_hostname 5
+    third_hostname 2
+
+The name being the system hostname and the number being the number of workers
+to launch on this host.
 
 Using a list of host
 ~~~~~~~~~~~~~~~~~~~~
@@ -304,18 +225,32 @@ Choosing the number of workers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The number of workers started should be equal to the number of cores you have 
-on each machine. If you wish to start more or less worker than specified in your
+on each machine. If you wish to start more or less workers than specified in your
 hostfile or in your hostlist, you can use the :option:`-n` parameter.
+
+.. note::
+    The :option:`-n` parameter overrides any previously specified worker 
+    amount.
+
+    If :option:`-n` if less than the sum of workers specified in the hostfile
+    or hostlist, the workers are launched in batch by host until the parameter
+    is reached.
+    This behaviour may ignore latters hosts.
+
+    If :option:`-n` if more than the sum of workers specified in the hostfile
+    or hostlist, the remaining workers are distributed using a Round-Robin
+    algorithm. Each host will increment its worker amount until the parameter
+    is reached.
 
 Be aware that tinkering with this parameter may hinder performances.
 The default value choosen by SCOOP (one worker by physical core) is generaly a
 good value.
 
-Startup scripts (supercomputer or grid)
----------------------------------------
+Startup scripts (cluster or grid)
+---------------------------------
 
-You must provide a startup script on systems using a scheduler. Here is 
-provided some example startup scripts using different grid task managers. They
+You must provide a startup script on systems using a scheduler. Here are some
+example startup scripts using different grid task managers. They
 are available in the |submitFilesPath|_ directory.
 
 .. |submitFilesPath| replace:: :file:`examples/submitFiles`
@@ -324,29 +259,27 @@ are available in the |submitFilesPath|_ directory.
 .. note::
     **Please note that these are only examples**. Refer to the documentation of 
     your scheduler for the list of arguments needed to run the task on your 
-    grid.
+    grid or cluster.
 
 Torque (Moab & Maui)
 ~~~~~~~~~~~~~~~~~~~~
 
-Here is an example of submit file for Torque:
+Here is an example of a submit file for Torque:
 
 .. literalinclude:: ../examples/submitFiles/Torque.sh
 
 Sun Grid Engine (SGE)
 ~~~~~~~~~~~~~~~~~~~~~
 
-Here is an example of submit file for SGE:
+Here is an example of a submit file for SGE:
 
 .. literalinclude:: ../examples/submitFiles/SGE.sh
 
 .. TODO Condor, Amazon EC2 using Boto & others
-        ~~~~~~
+
 
 Pitfalls
 --------
-
-.. * (Global variables? Todo?)
 
 Program scope
 ~~~~~~~~~~~~~
@@ -367,24 +300,32 @@ The :meth:`~scoop.futures.map` and :meth:`~scoop.futures.submit` will distribute
 their Futures both locally and remotely.
 Futures executed locally will be computed upon access (iteration for the 
 :meth:`~scoop.futures.map` and :meth:`~scoop._types.Future.result` for 
-:meth:`~scoop.futures.submit`).
-Futures distributed remotely will be executed right away.
+:meth:`~scoop.futures.submit`).Futures distributed remotely will be executed right away.
 
 Large datasets
 ~~~~~~~~~~~~~~
 
 Every parameter sent to a function by a :meth:`~scoop.futures.map` or 
 :meth:`~scoop.futures.submit` gets serialized and sent within the Future to its
-worker. Consider using a global variable in your module scope for passing large
-elements; it will then be loaded on launch by every worker and won't overload
-your network.
+worker. It results in slow speeds and network overload when sending large
+elements as a parameter to your function(s).
+
+You should consider using a global variable in your module scope for passing
+large elements; it will then be loaded on launch by every worker and won't
+overload your network.
 
 Incorrect::
 
     from scoop import futures
+
+
+    def mySum(inData):
+        """The worker will receive all its data from network."""
+        return sum(inData)
     
     if __name__ == '__main__':
-        results = list(futures.map(sum, zip(*([range(8)])*(2**16))))
+        data = [[i for i in range(x, x + 1000)] for x in range(0, 8001, 1000)]
+        results = list(futures.map(mySum, data))
 
 Better::
 
@@ -394,14 +335,16 @@ Better::
 
 
     def mySum(inIndex):
-      return sum(data[inIndex])
+        """The worker will only receive an index from network."""
+        return sum(data[inIndex])
     
     if __name__ == '__main__':
-        results = list(futures.map(mySum, range(8)))
+        results = list(futures.map(mySum, range(len(data))))
    
 SCOOP and greenlets
 ~~~~~~~~~~~~~~~~~~~
 
-Since SCOOP uses greenlets to schedule and run futures, programs using 
-greenlets won't work with SCOOP. However, you should consider replacing 
-the greenlets in your code by SCOOP functions.
+.. warning::
+    Since SCOOP uses greenlets to schedule and run futures. Programs that use 
+    their own greenlets won't work with SCOOP. However, you should consider
+    replacing the greenlets in your code by SCOOP functions.
