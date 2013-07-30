@@ -301,6 +301,7 @@ class ScoopApp(object):
                     data = inStream.read(1)
             self.errors = rootProcess.wait()
         self.log.info('Root process is done.')
+        return self.errors
 
     def close(self):
         """Subprocess cleanup."""
@@ -453,6 +454,7 @@ def main():
     except Exception as e:
         logging.error('Error while launching SCOOP subprocesses:')
         logging.error(traceback.format_exc())
+        rootTaskExitCode = -1
     finally:
         scoopApp.close()
 
