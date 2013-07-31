@@ -196,10 +196,14 @@ def mapScan(mapFunc, reductionOp, *iterables, **kwargs):
         results.append((future.executor, future.result()))
 
     # Cleanup phase
-    control.execQueue.socket.taskEnd(groupID)
+    control.execQueue.socket.taskEnd(groupID, askResults=scoop.worker)
+
+    while int(scoop.reduction.sequence[groupID]) != len(launches):
+        control.execQueue.socket._poll(0)
+        control.execQueue.updateQueue()
 
     # Re-order
-    scoop.reduction.total.pop(groupID)
+    scoop.reduction.total.pop(groupID, None)
     return list(zip(*sorted(results, key=lambda x: (x[0]))))[1]
 
 
@@ -224,7 +228,6 @@ def mapReduce(mapFunc, reductionOp, *iterables, **kwargs):
         is no limit on the wait time. More information in the :doc:`usage` page.
 
     :returns: A single value."""
-    # TODO: make DRY with submit
     launches = []
     # Set a callback group ID for the Futures generated within this scope
     groupID = (control.current.id, next(callbackGroupID))
@@ -255,13 +258,12 @@ def mapReduce(mapFunc, reductionOp, *iterables, **kwargs):
     control.execQueue.socket.taskEnd(groupID, askResults=scoop.worker)
 
     # Reduce the results
-    while groupID not in scoop.reduction.answers \
-    or sum(list(zip(*scoop.reduction.answers[groupID].values()))[0]) != len(launches):
+    while int(scoop.reduction.sequence[groupID]) != len(launches):
         control.execQueue.socket._poll(0)
         control.execQueue.updateQueue()
 
     ret_value = scoop.reduction.total.get(groupID).resultValue
-    scoop.reduction.total.pop(groupID)
+    scoop.reduction.total.pop(groupID, None)
     return ret_value
 
 
