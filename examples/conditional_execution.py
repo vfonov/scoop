@@ -15,23 +15,17 @@
 #    License along with SCOOP. If not, see <http://www.gnu.org/licenses/>.
 #
 """
-A very simple example of recursive nested tasks.
-Each task maps 2 others tasks, each of these 2 tasks maps 2 others, etc.,
-up to RECURSIVITY_DEPTH.
+Shows the conditional execution of a parallel Future.
 """
-
 from scoop import futures
+import random
 
-RECURSIVITY_DEPTH = 12
+first_type = lambda x: x + " World"
+second_type = lambda x: x + " Parallel World"
 
-def recursiveFunc(level):
-    if level == 0:
-        return 1
+if __name__ == '__main__':
+    if random.random() < 0.5:
+        my_future = futures.submit(first_type, "Hello")
     else:
-        args = [level-1] * 2
-        s = sum(futures.map(recursiveFunc, args))
-        return s
-
-if __name__ == "__main__":
-    result = recursiveFunc(RECURSIVITY_DEPTH)
-    print("2^{RECURSIVITY_DEPTH} = {result}".format(**locals()))
+        my_future = futures.submit(second_type, "Hello")
+    print(my_future.result())
