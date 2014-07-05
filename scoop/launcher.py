@@ -467,6 +467,11 @@ def main():
     if args.environment:
         environment=os.environ
 
+    env=utils.getEnv()
+    
+    if args.slave:
+        env='SLAVE'
+
     # Launch SCOOP
     thisScoopApp = ScoopApp(hosts, n, args.b,
                             args.verbose if not args.quiet else 0,
@@ -474,7 +479,7 @@ def main():
                             args.external_hostname[0],
                             args.executable, args.args, args.tunnel,
                             args.path, args.debug, args.nice,
-                            utils.getEnv(), args.profile, args.pythonpath[0],
+                            env, args.profile, args.pythonpath[0],
                             args.prolog[0], args.backend, environment)
 
     rootTaskExitCode = False
