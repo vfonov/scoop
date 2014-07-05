@@ -35,7 +35,7 @@ class Host(object):
         [
             'pythonPath', 'path', 'nice', 'pythonExecutable', 'size', 'origin',
             'brokerHostname', 'brokerPorts', 'debug', 'profiling', 'executable',
-            'verbose', 'args', 'prolog', 'backend'
+            'verbose', 'args', 'prolog', 'backend', 'environment'
         ]
     )
 
@@ -79,6 +79,12 @@ class Host(object):
            bootstrap."""
         worker = self.workersArguments
         c = []
+        
+        if worker.environment is not None:
+            # TODO make it work with tcsh as well
+            for (k,v) in worker.environment.items():
+                c.append("export {}={} &&".format(k,v))
+            
         if worker.prolog:
             c.extend([
                 "source",

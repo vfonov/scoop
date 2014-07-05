@@ -48,7 +48,7 @@ class ScoopApp(object):
 
     def __init__(self, hosts, n, b, verbose, python_executable,
             externalHostname, executable, arguments, tunnel, path, debug,
-            nice, env, profile, pythonPath, prolog, backend):
+            nice, env, profile, pythonPath, prolog, backend, environment):
         # Assure setup sanity
         assert type(hosts) == list and hosts, (
             "You should at least specify one host.")
@@ -71,6 +71,7 @@ class ScoopApp(object):
         self.profile = profile
         self.backend = backend
         self.errors = None
+        self.environment = environment
 
         # Logging configuration
         if self.verbose > 3:
@@ -91,7 +92,7 @@ class ScoopApp(object):
             )
         )
 
-        if env in ["SLURM","PBS", "SGE"]:
+        if env in ["SLURM", "PBS", "SGE", "SLAVE"]:
             scoop.logger.info("Detected {0} environment.".format(env))
         scoop.logger.info("Deploying {0} worker(s) over {1} "
                       "host(s).".format(
@@ -220,6 +221,7 @@ class ScoopApp(object):
             'verbose': self.verbose,
             'backend': self.backend,
             'args': self.args,
+            'environment': self.environment,
         }
         return args, kwargs
 
@@ -256,6 +258,7 @@ class ScoopApp(object):
                         debug=self.debug,
                         nice=self.nice,
                         backend=self.backend,
+                        environment=self.environment,
                     ))
 
         # Share connection information between brokers
@@ -337,7 +340,7 @@ def makeParser():
         description="Starts a parallel program using SCOOP.",
         prog="{0} -m scoop".format(sys.executable),
     )
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group()    
     group.add_argument('--hosts', '--host',
                        help="The list of hosts. The first host will execute "
                             "the origin. (default is 127.0.0.1)",
@@ -410,6 +413,12 @@ def makeParser():
     parser.add_argument('--debug',
                         help=argparse.SUPPRESS,
                         action='store_true')
+    parser.add_argument('--slave',
+                        help="Used to launch work using external launch mechanism",
+                        action='store_true')
+    parser.add_argument('--environment','-V',
+                        help="Pass the whole environment to the slave workers",
+                        action='store_true')
     parser.add_argument('--profile',
                         help=("Turn on the profiling. SCOOP will call "
                         "cProfile.run on the executable for every worker and"
@@ -438,6 +447,7 @@ def main():
     parser = makeParser()
     args = parser.parse_args()
 
+    # TODO: handle slave mode properly
     # Get a list of resources to launch worker(s) on
     hosts = utils.getHosts(args.hostfile, args.hosts)
 
@@ -453,6 +463,10 @@ def main():
     if not args.external_hostname:
         args.external_hostname = [utils.externalHostname(hosts)]
 
+    environment=None
+    if args.environment:
+        environment=os.environ
+
     # Launch SCOOP
     thisScoopApp = ScoopApp(hosts, n, args.b,
                             args.verbose if not args.quiet else 0,
@@ -461,7 +475,7 @@ def main():
                             args.executable, args.args, args.tunnel,
                             args.path, args.debug, args.nice,
                             utils.getEnv(), args.profile, args.pythonpath[0],
-                            args.prolog[0], args.backend)
+                            args.prolog[0], args.backend, environment)
 
     rootTaskExitCode = False
     interruptPreventer = Thread(target=thisScoopApp.close)
