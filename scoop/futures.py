@@ -72,7 +72,7 @@ def _startup(rootFuture, *args, **kargs):
     return result
 
 
-def _mapFuture(callable_, *iterables):
+def _mapFuture(callable_, *iterables,**kwargs):
     """Similar to the built-in map function, but each of its
     iteration will spawn a separate independent parallel Future that will run
     either locally or remotely as `callable(*args)`.
@@ -94,7 +94,7 @@ def _mapFuture(callable_, *iterables):
     mapJoin that will wait or join before returning."""
     childrenList = []
     for args in zip(*iterables):
-        childrenList.append(submit(callable_, *args))
+        childrenList.append(submit(callable_, *args, **kwargs))
     return childrenList
 
 def _mapGenerator(futures):
@@ -129,7 +129,7 @@ def map(func, *iterables, **kwargs):
     :returns: A generator of map results, each corresponding to one map
         iteration."""
     # TODO: Handle timeout
-    futures = _mapFuture(func, *iterables)
+    futures = _mapFuture(func, *iterables, **kwargs)
     return _mapGenerator(futures)
 
 
@@ -150,11 +150,11 @@ def map_as_completed(func, *iterables, **kwargs):
     :returns: A generator of map results, each corresponding to one map
         iteration."""
     # TODO: Handle timeout
-    for future in as_completed(_mapFuture(func, *iterables)):
+    for future in as_completed(_mapFuture(func, *iterables,**kwargs)):
         yield future.resultValue
 
 
-def _recursiveReduce(mapFunc, reductionFunc, scan, *iterables):
+def _recursiveReduce(mapFunc, reductionFunc, scan, *iterables, **kwargs):
     """Generates the recursive reduction tree. Used by mapReduce."""
     if iterables:
         half = min(len(x) // 2 for x in iterables)
@@ -168,14 +168,15 @@ def _recursiveReduce(mapFunc, reductionFunc, scan, *iterables):
     out_results = [None, None]
     for index, data in enumerate([data_left, data_right]):
         if any(len(x) <= 1 for x in data):
-            out_results[index] = mapFunc(*list(zip(*data))[0])
+            out_results[index] = mapFunc(*list(zip(*data))[0],**kwargs)
         else:
             out_futures[index] = submit(
                 _recursiveReduce,
                 mapFunc,
                 reductionFunc,
                 scan,
-                *data
+                *data,
+                **kwargs
             )
 
     # Wait for the results
@@ -225,7 +226,8 @@ def mapScan(mapFunc, reductionFunc, *iterables, **kwargs):
         mapFunc,
         reductionFunc,
         True,
-        *iterables
+        *iterables,
+        **kwargs
     ).result()
 
 
@@ -255,11 +257,12 @@ def mapReduce(mapFunc, reductionFunc, *iterables, **kwargs):
         mapFunc,
         reductionFunc,
         False,
-        *iterables
+        *iterables,
+        **kwargs
     ).result()
 
 
-def _createFuture(func, *args):
+def _createFuture(func, *args, **kwargs):
     """Helper function to create a future."""
     assert callable(func), (
         "The provided func parameter is not a callable."
@@ -276,10 +279,10 @@ def _createFuture(func, *args):
         from .shared import SharedElementEncapsulation
         func = SharedElementEncapsulation(func)
 
-    return Future(control.current.id, func, *args)
+    return Future(control.current.id, func, *args, **kwargs)
 
 @ensureScoopStartedProperly
-def submit(func, *args):
+def submit(func, *args, **kwargs):
     """Submit an independent asynchronous :class:`~scoop._types.Future` that will
     either run locally or remotely as `func(*args)`.
 
@@ -288,6 +291,9 @@ def submit(func, *args):
         The callable must return a value.
     :param args: A tuple of positional arguments that will be passed to the
         func object.
+        
+    :param kwargs: A dictionary of additional keyword arguments that will be
+        passed to the callable object.
 
     :returns: A future object for retrieving the Future result.
 
@@ -296,7 +302,7 @@ def submit(func, *args):
     may carry on with any further computations while the Future completes.
     Result retrieval is made via the :meth:`~scoop._types.Future.result`
     function on the Future."""
-    child = _createFuture(func, *args)
+    child = _createFuture(func, *args, **kwargs)
 
     control.futureDict[control.current.id].children[child] = None
     control.execQueue.append(child)
