@@ -291,9 +291,14 @@ def submit(func, *args, **kwargs):
         The callable must return a value.
     :param args: A tuple of positional arguments that will be passed to the
         func object.
+<<<<<<< HEAD
         
     :param kwargs: A dictionary of additional keyword arguments that will be
         passed to the callable object.
+=======
+    :param kwargs: A dictionary of additional arguments that will be passed to
+        the func object.
+>>>>>>> origin/master
 
     :returns: A future object for retrieving the Future result.
 
