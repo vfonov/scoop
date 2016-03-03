@@ -47,7 +47,8 @@ class ScoopApp(object):
 
     def __init__(self, hosts, n, b, verbose, python_executable,
             externalHostname, executable, arguments, tunnel, path, debug,
-            nice, env, profile, pythonPath, prolog, backend, rsh):
+            nice, env, profile, pythonPath, prolog, backend, rsh,
+            ssh_executable):
         # Assure setup sanity
         assert type(hosts) == list and hosts, (
             "You should at least specify one host.")
@@ -56,6 +57,7 @@ class ScoopApp(object):
 
         # launch information
         self.python_executable = python_executable[0]
+        self.ssh_executable = ssh_executable
         self.pythonpath = pythonPath
         self.prolog = prolog
         self.n = n
@@ -118,13 +120,13 @@ class ScoopApp(object):
                 "The -n flag is set at {0} workers, which is higher than the "
                 "maximum number of workers ({1}) specified by the hostfile.\n"
                 "This behavior may degrade the performances of scoop for "
-                "cpu-bound operations.".format(qty, maximumWorkers)
+                "cpu-bound operations.", self.n, maximumWorkers
             )
         elif self.n < maximumWorkers and self.n > 0:
             scoop.logger.debug(
                 "The -n flag is set at {0} workers, which is lower than the "
-                "maximum number of workers ({1}) specified by the hostfile."
-                "".format(qty, maximumWorkers)
+                "maximum number of workers ({1}) specified by the hostfile.",
+                self.n, maximumWorkers
             )
 
         # Display
@@ -160,7 +162,7 @@ class ScoopApp(object):
 
         # If specified amount of workers if lower than sum of each specified.
         elif qty < maximumWorkers:
-            
+
             while qty < maximumWorkers:
                 maximumWorkers -= hosts[-1][1]
                 if qty > maximumWorkers:
@@ -257,6 +259,7 @@ class ScoopApp(object):
                         nice=self.nice,
                         backend=self.backend,
                         rsh=self.rsh,
+                        ssh_executable=self.ssh_executable,
                     ))
 
         # Share connection information between brokers
@@ -278,7 +281,8 @@ class ScoopApp(object):
         shells = []
         origin_launched = False
         for hostname, nb_workers in self.worker_hosts:
-            self.workers.append(self.LAUNCH_HOST_CLASS(hostname, self.rsh))
+            self.workers.append(self.LAUNCH_HOST_CLASS(hostname, self.rsh,
+                                                       self.ssh_executable))
             total_workers_host = min(nb_workers, self.workersLeft)
 
             self.setWorkerInfo(hostname, total_workers_host, not origin_launched)
@@ -384,6 +388,10 @@ def makeParser():
                         help="Use RSH instead of SSH for the launching process. "
                              "Not compatible with --tunnel flag.",
                         action='store_true')
+    parser.add_argument('--ssh-executable',
+                        help="Name of the ssh executable. (default: 'ssh')",
+                        default="ssh",
+                        metavar="SSHExecutable")
     parser.add_argument('--tunnel',
                         help="Activate ssh tunnels to route toward the broker "
                              "sockets over remote connections (may eliminate "
@@ -466,7 +474,8 @@ def main():
                             args.executable, args.args, args.tunnel,
                             args.path, args.debug, args.nice,
                             utils.getEnv(), args.profile, args.pythonpath[0],
-                            args.prolog[0], args.backend, args.rsh)
+                            args.prolog[0], args.backend, args.rsh,
+                            args.ssh_executable)
 
     rootTaskExitCode = False
     interruptPreventer = Thread(target=thisScoopApp.close)

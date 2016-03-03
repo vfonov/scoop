@@ -180,7 +180,7 @@ Its functionnalities are summarised in this example::
 
 
     if __name__ == '__main__':
-        shared.setCont(myValue=5)
+        shared.setConst(myValue=5)
         print(list(futures.map(myParallelFunc, range(10))))
 
 
@@ -213,7 +213,7 @@ such::
     python -m scoop fullTree.py
 
 .. |exampleDirectory| replace:: :file:`examples/`
-.. _exampleDirectory: https://code.google.com/p/scoop/source/browse/examples/
+.. _exampleDirectory: https://github.com/soravux/scoop/tree/master/examples/
 
 .. note::
   When using a Python version prior to 2.7, you must start SCOOP using 
@@ -318,7 +318,7 @@ using different grid task managers. Some example startup scripts are available
 in the |submit_files_path|_ directory.
 
 .. |submit_files_path| replace:: :file:`examples/submit_files`
-.. _submit_files_path: https://code.google.com/p/scoop/source/browse/examples/submit_files/
+.. _submit_files_path: https://github.com/soravux/scoop/tree/master/examples/submit_files/
 
 SCOOP natively supports Sun Grid Engine (SGE), Torque (PBS-compatible, Moab,
 Maui) and SLURM. That means that a minimum launch file is needed while the

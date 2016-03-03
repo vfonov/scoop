@@ -5,44 +5,47 @@ from setuptools import setup
 import scoop
 import sys
 
+try:
+    from pypandoc import convert
+except ImportError:
+    print("warning: pypandoc module not found, could not convert Markdown to RST")
+    read_md = lambda f: open(f, 'r').read()
+else:
+    read_md = lambda f: convert(f, 'rst')
+
 # Backports installation
-extraPackages = []
+extraPackages, extraRequires = [], []
 if sys.version_info < (2, 7):
     extraPackages = ['scoop.backports']
+    extraRequires = ['argparse>=1.1']
 
 
 setup(name='scoop',
-      version="{ver} {rev}".format(
+      version="{ver}.{rev}".format(
           ver=scoop.__version__,
           rev=scoop.__revision__,
       ),
       description='Scalable COncurrent Operations in Python',
-      long_description=open('README.txt').read(),
+      long_description=read_md('README.md'),
       author='SCOOP Development Team',
       author_email='scoop-users@googlegroups.com',
-      url='http://scoop.googlecode.com',
-      download_url='http://code.google.com/p/scoop/downloads/list',
+      url='http://pyscoop.org',
       install_requires=['greenlet>=0.3.4',
-                        'pyzmq>=13.1.0',
-                        'argparse>=1.1',
-                        ],
-      extras_require = {'nice': ['psutil>=0.6.1'],
-                        },
+                        'pyzmq>=13.1.0'] + extraRequires,
+      extras_require = {'nice': ['psutil>=0.6.1']},
       packages=['scoop',
                 'scoop.bootstrap',
                 'scoop.launch',
                 'scoop.broker',
                 'scoop._comm',
-                'scoop.discovery',
-                ] + extraPackages,
+                'scoop.discovery'] + extraPackages,
       platforms=['any'],
       keywords=['distributed algorithms',
                 'parallel programming',
                 'Concurrency',
                 'Cluster programming',
                 'greenlet',
-                'zmq',
-                ],
+                'zmq'],
       license='LGPL',
       classifiers=[
         'Development Status :: 4 - Beta',
