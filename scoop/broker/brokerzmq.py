@@ -258,6 +258,7 @@ class Broker(object):
                 address = msg[0]
                 try:
                     tasks_ids = pickle.loads(msg[2])
+                    tasks_ids = set(pickle.dumps(x) for x in tasks_ids)
                 except:
                     self.logger.error("Could not unpickle status update message.")
                 else:
@@ -324,8 +325,8 @@ class Broker(object):
     def pruneAssignedTasks(self):
         to_keep = set()
         for address in self.assigned_tasks.keys():
-            addr_time = self.status_times.get(address, 0)
-            if addr_time + scoop.TIME_BETWEEN_STATUS_PRUNING > time.time():
+            addr_time = self.status_times.get(address)
+            if not addr_time or addr_time + scoop.TIME_BETWEEN_STATUS_PRUNING > time.time():
                 to_keep.add(address)
 
         to_remove = set(self.assigned_tasks.keys()).difference(to_keep)
