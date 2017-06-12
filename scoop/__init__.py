@@ -18,7 +18,7 @@ __author__ = ("Marc Parizeau", "Olivier Gagnon", "Marc-Andre Gardner",
               "Yannick Hold-Geoffroy", "Felix-Antoine Fortin",
               "Francois-Michel de Rainville")
 __version__ = "0.7"
-__revision__ = "2.0-r2"
+__revision__ = "2.0-dev3"
 
 import logging
 
