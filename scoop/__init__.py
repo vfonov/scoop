@@ -16,9 +16,9 @@
 #
 __author__ = ("Marc Parizeau", "Olivier Gagnon", "Marc-Andre Gardner",
               "Yannick Hold-Geoffroy", "Felix-Antoine Fortin",
-              "Francois-Michel de Rainville")
+              "Francois-Michel de Rainville", "Arjun Rao")
 __version__ = "0.7"
-__revision__ = "2.0-dev7"
+__revision__ = "2.0-dev8"
 
 import logging
 

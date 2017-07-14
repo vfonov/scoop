@@ -185,6 +185,14 @@ class ZMQCommunicator(object):
             while True:
                 time.sleep(scoop.TIME_BETWEEN_HEARTBEATS)
                 # print('SENDING HEARTBEAT on worker {} at time {}'.format(scoop.worker, time.time()))
+
+                # NOTE: This is not compatible with Windows :-(
+                import os
+                ppid = os.getppid()
+                if ppid == 1:
+                    scoop.logger.info("Parent seems to have died. Shutting down.")
+                    break
+
                 try:
                     self.heartbeat_socket.send_multipart([
                         HEARTBEAT,
