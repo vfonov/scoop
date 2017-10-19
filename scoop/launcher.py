@@ -47,7 +47,7 @@ class ScoopApp(object):
 
     def __init__(self, hosts, n, b, verbose, python_executable,
             externalHostname, executable, arguments, tunnel, path, debug,
-            nice, env, profile, pythonPath, prolog, backend):
+            nice, env, profile, pythonPath, prolog, backend, use_srun=False):
         # Assure setup sanity
         assert type(hosts) == list and hosts, ("You should at least "
                                                "specify one host.")
@@ -70,6 +70,7 @@ class ScoopApp(object):
         self.profile = profile
         self.backend = backend
         self.errors = None
+	self.use_srun = use_srun
 
         # Logging configuration
         if self.verbose > 2:
@@ -89,8 +90,12 @@ class ScoopApp(object):
                 sys.api_version,
             )
         )
-
-        if env in ["SLURM","PBS", "SGE"]:
+	
+	if self.use_srun :
+		#
+		scoop.logger.info("Using srun command")
+		#
+        elif env in ["SLURM","PBS", "SGE"]:
             scoop.logger.info("Detected {0} environment.".format(env))
         scoop.logger.info("Deploying {0} worker(s) over {1} "
                       "host(s).".format(
@@ -107,7 +112,13 @@ class ScoopApp(object):
                      '{0}.'.format(self.python_executable))
 
         # Create launch lists
-        self.broker_hosts = self.divideHosts(hosts[:], self.b)
+	if self.use_srun :
+                scoop.logger.info("Using single broker:{0}".format(self.externalHostname))
+		self.broker_hosts = [ (self.externalHostname, 1) ]
+                self.b=1
+	else:
+                self.broker_hosts = self.divideHosts(hosts[:], self.b)
+
         self.worker_hosts = self.divideHosts(hosts, self.n)
 
         # Logging of worker distribution warnings
@@ -376,6 +387,9 @@ def makeParser():
                         default=1)
     parser.add_argument('--quiet', '-q',
                         action='store_true')
+    parser.add_argument('--srun',
+			help='Use srun',
+			action='store_true')
     parser.add_argument('-n',
                         help="Total number of workers to launch on the hosts. "
                              "Workers are spawned sequentially over the hosts. "
@@ -453,15 +467,26 @@ def main():
     args = parser.parse_args()
 
     # Get a list of resources to launch worker(s) on
-    hosts = utils.getHosts(args.hostfile, args.hosts)
-    if args.n:
-        n = args.n
+    if args.srun:
+       # using SLURM environment
+       n = int(os.environ.get('SLURM_NTASKS','1'))
+       hosts = [ ('h{}'.format(i),1) for i in range(n) ]
     else:
-        n = utils.getWorkerQte(hosts)
+       hosts = utils.getHosts(args.hostfile, args.hosts)
+
+       if args.n:
+          n = args.n
+       else:
+          n = utils.getWorkerQte(hosts)
+
     assert n > 0, ("Scoop couldn't determine the number of worker to start.\n"
                    "Use the '-n' flag to set it manually.")
+
     if not args.external_hostname:
-        args.external_hostname = [utils.externalHostname(hosts)]
+        if args.srun:
+           args.external_hostname = [ utils.localHostnames[-1] ]
+        else:
+           args.external_hostname = [ utils.externalHostname(hosts) ]
 
     # Launch SCOOP
     thisScoopApp = ScoopApp(hosts, n, args.b,
@@ -471,7 +496,7 @@ def main():
                             args.executable, args.args, args.tunnel,
                             args.path, args.debug, args.nice,
                             utils.getEnv(), args.profile, args.pythonpath[0],
-                            args.prolog[0], args.backend)
+                            args.prolog[0], args.backend, use_srun=args.srun )
 
     rootTaskExitCode = False
     interruptPreventer = Thread(target=thisScoopApp.close)

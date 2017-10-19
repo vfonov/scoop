@@ -30,6 +30,8 @@ class Host(object):
        Can be remote (ssh via netowrk) or represent localhost."""
     BOOTSTRAP_MODULE = 'scoop.bootstrap.__main__'
     BASE_SSH = ['ssh', '-x', '-n', '-oStrictHostKeyChecking=no']
+    BASE_SRUN = ['srun','--exclusive','-n1','bash','-c']
+
     LAUNCHING_ARGUMENTS = namedtuple(
         'launchingArguments',
         [
@@ -198,14 +200,14 @@ class Host(object):
                 )
         else:
             # Launching remotely
-            sshCmd = self.BASE_SSH
+            sshCmd = self.BASE_SRUN # self.BASE_SSH
             if tunnelPorts is not None:
                 sshCmd += [
                     '-R {0}:127.0.0.1:{0}'.format(tunnelPorts[0]),
                     '-R {0}:127.0.0.1:{0}'.format(tunnelPorts[1]),
                 ]
             self.subprocesses.append(
-                subprocess.Popen(sshCmd + [self.hostname, self.getCommand()],
+                subprocess.Popen(sshCmd + [self.getCommand()], # self.hostname,
                                  stdout=subprocess.PIPE if stdPipe else None,
                                  stderr=subprocess.PIPE if stdPipe else None,
                 )
