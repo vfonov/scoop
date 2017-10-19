@@ -434,6 +434,10 @@ def makeParser():
                         help="Choice of communication backend",
                         choices=['ZMQ', 'TCP'],
                         default='ZMQ')
+    parser.add_argument('--srun',
+                        help="Use srun to execute remote processes",
+                        default=False,
+                        action='store_true')
     parser.add_argument('executable',
                         nargs='?',
                         help='The executable to start with SCOOP')
