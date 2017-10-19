@@ -194,31 +194,39 @@ def getHostsFromList(hostlist):
     return retVal
 
 
-def parseSLURM(string):
-    """Return a host list from a SLURM string"""
+def parseSLURM(string,tasks):
+    """Return a host list from a SLURM environment parameters"""
+    ntasks=int(1)
+    if tasks is not None and tasks!='':
+        #have to figure out how to deal with something like N(xM)
+        g=re.match('(\d+)\(x(\d+)\)',tasks)
+        if g:
+            ntasks=int(g.group(1))
+        else: 
+            ntasks=int(tasks)
     bunchedlist = re.findall('([^ /\t=\n\[,]+)(?=\[)(.*?)(?<=\])', string)
-
     hosts = []
-
     # parse out the name followd by range (ex. borgb[001-002,004-006]
-    for h,n in bunchedlist:
-
-        block = re.findall('([^\[\],]+)', n)
-        for rng in block:
-
-            bmin,bmax = rng.split('-')
-            fill_width = max(len(bmin),len(bmax))
-            for i in range(int(bmin),int(bmax)+1):
-                hostname = str(h)+str(i).zfill(fill_width)
-                hosts.append((hostname, int(1)))
-
-
+    if len(bunchedlist)>0:
+        for h,n in bunchedlist:
+            block = re.findall('([^\[\],]+)', n)
+            for rng in block:
+                if rng.find('-')>=0:
+                    bmin,bmax = rng.split('-')
+                    fill_width = max(len(bmin),len(bmax))
+                    for i in range(int(bmin),int(bmax)+1):
+                        hostname = str(h)+str(i).zfill(fill_width)
+                        hosts.append((hostname, ntasks))
+                else: # just a host id
+                    hosts.append((str(h)+rng, ntasks))
+    else:
+        hosts.append((string, ntasks))
     return hosts
 
 
 def getHostsFromSLURM():
     """Return a host list from a SLURM environment"""
-    return parseSLURM(os.environ["SLURM_NODELIST"])
+    return parseSLURM(os.environ["SLURM_NODELIST"],os.get('SLURM_TASKS_PER_NODE',None))
 
 
 def getHostsFromPBS():
