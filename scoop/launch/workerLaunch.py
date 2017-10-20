@@ -30,7 +30,7 @@ class Host(object):
        Can be remote (ssh via netowrk) or represent localhost."""
     BOOTSTRAP_MODULE = 'scoop.bootstrap.__main__'
     BASE_SSH = ['ssh', '-x', '-n', '-oStrictHostKeyChecking=no']
-    BASE_SRUN = ['srun','--exclusive','-n1','bash','-c']
+    BASE_SRUN = ['srun','--exclusive','--ntasks=1','bash','-c']
 
     LAUNCHING_ARGUMENTS = namedtuple(
         'launchingArguments',
