@@ -41,11 +41,12 @@ class Host(object):
         ]
     )
 
-    def __init__(self, hostname="localhost"):
+    def __init__(self, hostname="localhost", use_srun=False):
         self.workersArguments = []
         self.hostname = hostname
         self.subprocesses = []
         self.remoteProcessGID = None
+        self.use_srun = use_srun
 
     def __repr__(self):
         return "{0} ({1} workers)".format(
@@ -200,14 +201,18 @@ class Host(object):
                 )
         else:
             # Launching remotely
-            sshCmd = self.BASE_SRUN # self.BASE_SSH
+            if self.use_srun:
+                sshCmd = self.BASE_SRUN # SRUN does not need a hostname to run, it will allocate available 
+            else:
+                sshCmd = self.BASE_SSH + [ self.hostname ]
+                
             if tunnelPorts is not None:
                 sshCmd += [
                     '-R {0}:127.0.0.1:{0}'.format(tunnelPorts[0]),
                     '-R {0}:127.0.0.1:{0}'.format(tunnelPorts[1]),
                 ]
             self.subprocesses.append(
-                subprocess.Popen(sshCmd + [self.getCommand()], # self.hostname,
+                subprocess.Popen(sshCmd + [self.getCommand()],
                                  stdout=subprocess.PIPE if stdPipe else None,
                                  stderr=subprocess.PIPE if stdPipe else None,
                 )

@@ -288,7 +288,7 @@ class ScoopApp(object):
 
         # Launch the workers
         for hostname, nb_workers in self.worker_hosts:
-            self.workers.append(self.LAUNCH_HOST_CLASS(hostname))
+            self.workers.append( self.LAUNCH_HOST_CLASS(hostname=hostname, use_srun=self.use_srun) )
             total_workers_host = min(nb_workers, self.workersLeft)
             for worker_idx_host in range(total_workers_host):
                 workerinfo = {
