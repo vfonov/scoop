@@ -25,7 +25,7 @@ from threading import Thread
 # Local
 import scoop
 from scoop import utils
-from .constants import BASE_SSH, BASE_RSH
+from .constants import BASE_SSH, BASE_RSH,BASE_SRUN
 
 
 class Host(object):
@@ -40,13 +40,14 @@ class Host(object):
         ]
     )
 
-    def __init__(self, hostname="localhost", rsh=False, ssh_executable='ssh'):
+    def __init__(self, hostname="localhost", rsh=False, ssh_executable='ssh', use_srun=False):
         self.workersArguments = None
         self.hostname = hostname
         self.subprocesses = []
         self.workerAmount = 0
         self.rsh = rsh
         self.ssh_executable = ssh_executable
+        self.use_srun = use_srun
 
     def __repr__(self):
         return "{0} ({1} workers)".format(
@@ -195,14 +196,21 @@ class Host(object):
             self.subprocesses.append(subprocess.Popen(c))
         else:
             # Launching remotely
-            BASE_SSH[0] = self.ssh_executable
-            sshCmd = BASE_SSH if not self.rsh else BASE_RSH
-            if tunnelPorts is not None:
-                sshCmd += [
-                    '-R {0}:127.0.0.1:{0}'.format(tunnelPorts[0]),
-                    '-R {0}:127.0.0.1:{0}'.format(tunnelPorts[1]),
-                ]
-            self.subprocesses.append(
+            if self.use_srun:
+                sshCmd = self.BASE_SRUN # SRUN does not need a hostname to run, it will allocate available 
+            else:
+                BASE_SSH[0] = self.ssh_executable
+                sshCmd = BASE_SSH if not self.rsh else BASE_RSH
+                sshCmd = sshCmd + [ self.hostname ]
+                
+#>>>>>>> origin/0.7.2.HACK
+            #if tunnelPorts is not None:
+                #sshCmd += [
+                    #'-R {0}:127.0.0.1:{0}'.format(tunnelPorts[0]),
+                    #'-R {0}:127.0.0.1:{0}'.format(tunnelPorts[1]),
+                #]
+            #self.subprocesses.append(
+#<<<<<<< HEAD
                 subprocess.Popen(sshCmd + [self.hostname, self.getCommand()],
                                  bufsize=-1,
                                  stdout=None,

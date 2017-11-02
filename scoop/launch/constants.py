@@ -36,3 +36,5 @@ BASE_SSH = [
 BASE_RSH = [
     'rsh',
 ]
+
+BASE_SRUN = ['srun','--exclusive','--ntasks=1','--nodes=1','bash','-c']

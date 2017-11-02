@@ -219,7 +219,7 @@ def parseSLURM(string):
 
 def getHostsFromSLURM():
     """Return a host list from a SLURM environment"""
-    return parseSLURM(os.environ["SLURM_NODELIST"])
+    return parseSLURM(os.environ["SLURM_NODELIST"],os.environ.get('SLURM_TASKS_PER_NODE',None))
 
 
 def getHostsFromPBS():
