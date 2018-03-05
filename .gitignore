@@ -3,3 +3,6 @@
 doc/_build
 dist/
 build/
+.idea
+__pycache__
+*.egg-info

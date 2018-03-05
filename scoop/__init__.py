@@ -16,9 +16,9 @@
 #
 __author__ = ("Marc Parizeau", "Olivier Gagnon", "Marc-Andre Gardner",
               "Yannick Hold-Geoffroy", "Felix-Antoine Fortin",
-              "Francois-Michel de Rainville")
+              "Francois-Michel de Rainville", "Arjun Rao")
 __version__ = "0.7"
-__revision__ = "2.0"
+__revision__ = "2.0-dev8"
 
 import logging
 
@@ -31,5 +31,6 @@ logger = logging.getLogger()
 SHUTDOWN_REQUESTED = False
 
 TIME_BETWEEN_PARTIALDEBUG = 30
-TIME_BETWEEN_STATUS_REPORTS = 25
-TIME_BETWEEN_STATUS_PRUNING = 60
+TIME_BETWEEN_HEARTBEATS = 25
+TASK_CHECK_INTERVAL = 15
+TIME_BEFORE_LOSING_WORKER = 60
